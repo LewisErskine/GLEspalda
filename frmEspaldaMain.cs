@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.IO;
 using System.Diagnostics;
 using Microsoft.Win32;
+using System.Threading.Tasks;
 
 namespace GL_ESPALDA
 {
@@ -87,14 +88,14 @@ namespace GL_ESPALDA
 		#region CONSTRUCTOR
 		public frmEspaldaMain()
 		{
-			program_version = "2.2.2";
+			program_version = "2.2.3";
 			
 			//
 			// Required for Windows Form Designer support
 			//
 			InitializeComponent();
 
-			text_brush = new SolidBrush (Color.White);
+			/*text_brush = new SolidBrush (Color.White);
 			text_x = 1;
 			text_y = 25;
 
@@ -107,7 +108,7 @@ namespace GL_ESPALDA
 			max_lines_number = 2500;
 			max_visible_lines_number = ((int)this.ClientSize.Height - (int)text_y) / 30 + 1;
 			espalda_lines = new EspaldaLine[max_lines_number];
-			InitializeLinesText ();
+			await InitializeLinesText ();
 			line_number = 1;
 			visible_start_line_number = 1;
 
@@ -147,13 +148,71 @@ namespace GL_ESPALDA
 			commands[21] = "hrm";
 			Array.Sort (commands);
 
-			yes_no_question_object = null;
+			yes_no_question_object = null;*/
 			
 			// Double Buffering
 			SetStyle(ControlStyles.UserPaint, true);
 			SetStyle(ControlStyles.AllPaintingInWmPaint, true);
 			SetStyle(ControlStyles.DoubleBuffer, true);
 		}
+
+		public async Task Init ()
+		{
+            text_brush = new SolidBrush(Color.White);
+            text_x = 1;
+            text_y = 25;
+
+            height_between_command_lines = 30;
+            height_between_output_lines = 30;
+
+            String current_dir = Environment.CurrentDirectory;
+            current_dir = current_dir.Replace("\\", "/");
+            line_start = current_dir.Substring(0, 3) + ">";
+            max_lines_number = 2500;
+            max_visible_lines_number = ((int)this.ClientSize.Height - (int)text_y) / 30 + 1;
+            espalda_lines = new EspaldaLine[max_lines_number];
+            await InitializeLinesText();
+            line_number = 1;
+            visible_start_line_number = 1;
+
+            ascii_encoding = new ASCIIEncoding();
+
+            get_line_number = -1;
+
+            last_key = Keys.None;
+
+            vScrollBar.Minimum = 0;
+            vScrollBar.Maximum = max_lines_number;
+
+            espalda_line_parser = new EspaldaLineParser();
+
+            commands = new String[22];
+            commands[0] = "exit";
+            commands[1] = "bye";
+            commands[2] = "quit";
+            commands[3] = "cls";
+            commands[4] = "date";
+            commands[5] = "time";
+            commands[6] = "dt";
+            commands[7] = "min";
+            commands[8] = "pwd";
+            commands[9] = "trem";
+            commands[10] = "sysinfo";
+            commands[11] = "dir";
+            commands[12] = "file";
+            commands[13] = "ls";
+            commands[14] = "cd";
+            commands[15] = "help";
+            commands[16] = "halt";
+            commands[17] = "reboot";
+            commands[18] = "title";
+            commands[19] = "delfile";
+            commands[20] = "gldoors";
+            commands[21] = "hrm";
+            Array.Sort(commands);
+
+            yes_no_question_object = null;
+        }
 		#endregion
 
 		#region Dispose
@@ -194,7 +253,7 @@ namespace GL_ESPALDA
 			this.vScrollBar.Name = "vScrollBar";
 			this.vScrollBar.Size = new System.Drawing.Size(16, 317);
 			this.vScrollBar.TabIndex = 1;
-			this.vScrollBar.Scroll += new System.Windows.Forms.ScrollEventHandler(this.vScrollBar_Scroll);
+			this.vScrollBar.Scroll += async (sender, e) => await vScrollBar_Scroll(sender, e);
 			// 
 			// frmEspaldaMain
 			// 
@@ -207,7 +266,7 @@ namespace GL_ESPALDA
 			this.KeyPreview = true;
 			this.Name = "frmEspaldaMain";
 			this.Text = "GL-ESPALDA";
-			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.frmEspaldaMain_KeyDown);
+			this.KeyDown += async (sender, e) => await frmEspaldaMain_KeyDown(sender, e);
 			this.Resize += new System.EventHandler(this.frmEspaldaMain_Resize);
 			this.Paint += new System.Windows.Forms.PaintEventHandler(this.frmEspaldaMain_Paint);
 			this.ResumeLayout(false);
@@ -220,25 +279,31 @@ namespace GL_ESPALDA
 		/// The main entry point for the application.
 		/// </summary>
 		[STAThread]
-		static void Main() 
+        internal static async Task Main() 
 		{
-			Application.Run(new frmEspaldaMain());
+            // To customize application configuration such as set high DPI settings or default font,
+            // see https://aka.ms/applicationconfiguration.
+            ApplicationConfiguration.Initialize();
+			var frmEspaldaMain = new frmEspaldaMain();
+			await frmEspaldaMain.Init();
+            Application.Run(frmEspaldaMain);
 		}
 		#endregion MAIN
 
-		#region DLL
-		[DllImport("user32.dll", CharSet=CharSet.Auto, ExactSpelling=true, CallingConvention=CallingConvention.Winapi)] 
-		public static extern short GetKeyState(int keyCode);
-		#endregion
-
 		#region FORM_KEYDOWN
-		private void frmEspaldaMain_KeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
+		private async Task frmEspaldaMain_KeyDown(object sender, KeyEventArgs e)
 		{
-			bool CapsLock = (((ushort) GetKeyState(0x14 /*VK_CAPITAL*/)) & 0xffff) != 0;
-			bool NumLock  = (((ushort) GetKeyState(0x90 /*VK_NUMLOCK*/)) & 0xffff) != 0;
-			bool up_character = (CapsLock && !e.Shift) || (!CapsLock && e.Shift);
+			if (e.KeyCode == Keys.ShiftKey)
+			{
+				e.Handled = true;
+				return;
+			}
+            bool capsLockOn = Control.IsKeyLocked(Keys.CapsLock);
+			bool NumLock = Control.IsKeyLocked(Keys.NumLock);
 
-			if (e.KeyCode == Keys.Menu && e.Control)
+			bool up_character = capsLockOn ? !e.Shift : e.Shift;
+
+            if (e.KeyCode == Keys.Menu && e.Control)
 			{
 				Alt_Gr = true;
 				return;
@@ -252,15 +317,15 @@ namespace GL_ESPALDA
 				visible_start_line_number = line_number - max_visible_lines_number + 1;
 			}
 			
-			String string_to_draw = "";
-			if ((e.KeyValue >= 65) && (e.KeyValue <= 90))
-			{
+			string string_to_draw = "";
+            if (char.IsLetter((char)e.KeyCode))
+            {
 				//
 				if (yes_no_question_object != null)
 				{
 					if (e.KeyValue == 89)
 					{
-						if (yes_no_question_object.YesNoQuestionCommandString == "Halt")
+						/*if (yes_no_question_object.YesNoQuestionCommandString == "Halt")
 						{
 							EspaldaWindowsShutdown sh = new EspaldaWindowsShutdown ();
 							sh.Halt ();
@@ -270,17 +335,18 @@ namespace GL_ESPALDA
 							EspaldaWindowsShutdown sh = new EspaldaWindowsShutdown ();
 							sh.Reboot ();
 						}
-						else if (yes_no_question_object.YesNoQuestionCommandString == "delfile")
+						else */
+						if (yes_no_question_object.YesNoQuestionCommandString == "delfile")
 						{
 							String[] files = (String[])yes_no_question_object.YesNoQuestionArguments;
 							foreach (String file in files)
 							{
 								File.Delete (file);
 							}
-							NewOutputLine (String.Format ("{0} fichier(s) supprimé(s).", files.Length));
+							await NewOutputLine ($"{files.Length} fichier(s) supprimé(s).");
 
 							// New line is visible
-							LineVisibilityCheck ();
+							await LineVisibilityCheck ();
 
 							// Open a new command line
 							line_number++;
@@ -296,7 +362,7 @@ namespace GL_ESPALDA
 				{
 					// Une lettre
 					string_to_draw = ascii_encoding.GetString(new Byte[1]{Convert.ToByte (e.KeyValue)});
-					string_to_draw = (CapsLock)?((e.Shift)?string_to_draw.ToLower ():string_to_draw):((!e.Shift)?string_to_draw.ToLower ():string_to_draw);
+                    string_to_draw = (!up_character) ? string_to_draw.ToLower () : string_to_draw;
 				}
 			}
 			else if (e.KeyCode == Keys.Space)
@@ -307,7 +373,7 @@ namespace GL_ESPALDA
 			{
 				if (espalda_lines[line_number - 1].TEXT != "")
 					espalda_lines[line_number - 1].TEXT = espalda_lines[line_number - 1].TEXT.Substring (0, espalda_lines[line_number - 1].TEXT.Length - 1);
-				LineVisibilityCheck ();
+				await LineVisibilityCheck ();
 
 				espalda_line_parser.ParseLine (espalda_lines[line_number - 1].TEXT.Substring (line_start.Length));
 				if (espalda_line_parser.COMPONENTS.Count == 0)
@@ -317,109 +383,109 @@ namespace GL_ESPALDA
 					|| (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "quit")
 					)
 				{
-					ByeCommand ();
+					await ByeCommand ();
 					return;
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "cd")
 				{
-					string_to_draw = CdCommand ();
+					string_to_draw = await CdCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "cd /")
 				{
-					CdantislashantislashCommand ();
+                    await CdantislashantislashCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "cd..")
 				{
-					string_to_draw = CddotdotCommand ();
+					string_to_draw = await CddotdotCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "cls")
 				{
-					ClsCommand ();
+                    await ClsCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "date")
 				{
-					DateCommand ();
+                    await DateCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "delfile")
 				{
-					DeleteFileCommand ();
+                    await DeleteFileCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "dir")
 				{
-					DirCommand ();	
+                    await DirCommand();	
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "dt")
 				{
-					DtCommand ();
+                    await DtCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "halt")
 				{
-					HaltCommand ();
+                    await HaltCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "help")
 				{
-					HelpCommand ();
+                    await HelpCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "hrm")
 				{
-					HrmCommand ();
+                    await HarmCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "file")
 				{
-					FileCommand ();	
+                    await FileCommand();	
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "glatomic")
 				{
-					GLAtomicCommand ();	
+                    await GLAtomicCommand();	
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "gldoors")
 				{
-					GLDoorsCommand ();	
+                    await GLDoorsCommand();	
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "ls")
 				{
-					LsCommand ();
+                    await LsCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "min")
 				{
-					MinCommand ();
+                    await MinCommand();
 				}
 				else if ((((((String)espalda_line_parser.COMPONENTS[0]).ToLower ()).Length == 2) && ((((String)espalda_line_parser.COMPONENTS[0]).ToLower ()).Substring (1) == ":"))
 					|| (((((String)espalda_line_parser.COMPONENTS[0]).ToLower ()).Length == 3) && ((((String)espalda_line_parser.COMPONENTS[0]).ToLower ()).Substring (1) == ":/"))
 					)
 				{
-					NewDriveLetter ();
+                    await NewDriveLetter();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "pwd")
 				{
-					PwdCommand ();
+                    await PwdCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "reboot")
 				{
-					RebootCommand ();
+                    await RebootCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "sysinfo")
 				{
-					SysinfoCommand ();
+                    await SysinfoCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "time")
 				{
-					TimeCommand ();
+                    await TimeCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "title")
 				{
-					TitleCommand ();
+                    await TitleCommand();
 				}
 				else if (((String)espalda_line_parser.COMPONENTS[0]).ToLower () == "trem")
 				{
-					TremCommand ();
+                    await TremCommand();
 				}
 				else
 				{
-					ExecutableCommand ();
+					await ExecutableCommand ();
 				}
 
-				CheckEndOfLines ();
+				await CheckEndOfLines ();
 
 				line_number++;
 				espalda_lines[line_number - 1].TEXT = line_start;
@@ -765,7 +831,7 @@ namespace GL_ESPALDA
 			{
 				try
 				{
-					string_to_draw = TabPressed ();
+					string_to_draw = await TabPressed ();
 				}
 				catch
 				{}
@@ -806,13 +872,13 @@ namespace GL_ESPALDA
 		#endregion
 
 		#region COMMANDS
-		private void ByeCommand ()
+		private async Task ByeCommand ()
 		{
-			NewOutputLine (line_start + "Au revoir!!");
+			await NewOutputLine (line_start + "Au revoir!!");
 			Application.Exit ();
 		}
 
-		private String CdCommand ()
+		private async Task<string> CdCommand ()
 		{
 			String string_to_draw = "";
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
@@ -848,7 +914,7 @@ namespace GL_ESPALDA
 				else
 				{
 					String start_dir = line_start.Substring (0, line_start.Length - 1);
-					dir = GoToDir (start_dir, dir);
+					dir = await GoToDir (start_dir, dir);
 										
 					if (dir != "")
 					{
@@ -857,7 +923,7 @@ namespace GL_ESPALDA
 					}
 					else
 					{
-						NewOutputLine ("Répertoire incorrect");
+						await NewOutputLine ("Répertoire incorrect");
 					}
 													
 				}
@@ -866,15 +932,17 @@ namespace GL_ESPALDA
 			return string_to_draw;
 		}
 
-		private void CdantislashantislashCommand ()
+		private async Task CdantislashantislashCommand ()
 		{
+			await Task.CompletedTask;
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			// return to root (drive)
 			line_start = line_start.Substring (0, 2) + "/>";
 		}
 
-		private String CddotdotCommand ()
+		private async Task<string> CddotdotCommand ()
 		{
+			await Task.CompletedTask;
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			// return to previous directory
 			line_start = line_start.Substring (0, line_start.LastIndexOf ("/"));
@@ -884,27 +952,28 @@ namespace GL_ESPALDA
 			return "line_end";
 		}
 
-		private void ClsCommand ()
+		private async Task ClsCommand ()
 		{
-			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
+            await Task.CompletedTask;
+            espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
 			visible_start_line_number = line_number + 1;	
 		}
 
-		private void DateCommand ()
+		private async Task DateCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			DateTime now = DateTime.Now;
-			NewOutputLine (String.Format ("{0:00}/{1:00}/{2:0000}", now.Day, now.Month, now.Year));
+			await NewOutputLine (String.Format ("{0:00}/{1:00}/{2:0000}", now.Day, now.Month, now.Year));
 		}
 
-		private void DeleteFileCommand ()
+		private async Task DeleteFileCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
 			if (espalda_line_parser.COMPONENTS.Count == 1)
 			{
-				NewOutputLine ("Spécifier ce qu'il faut supprimer.");
+				await NewOutputLine ("Spécifier ce qu'il faut supprimer.");
 				return;
 			}
 
@@ -922,19 +991,19 @@ namespace GL_ESPALDA
 
 			if (files.Length == 0)
 			{
-				NewOutputLine ("Rien à supprimer.");
+				await NewOutputLine ("Rien à supprimer.");
 				return;
 			}
 
 			if (files.Length == 1)
-				NewOutputLine (String.Format ("Supprimer un fichier? 'y' pour continuer, autre touche pour annuler."));
+				await NewOutputLine (String.Format ("Supprimer un fichier? 'y' pour continuer, autre touche pour annuler."));
 			else
-				NewOutputLine (String.Format ("Supprimer {0} fichiers? 'y' pour continuer, autre touche pour annuler.", files.Length));
+				await NewOutputLine (String.Format ("Supprimer {0} fichiers? 'y' pour continuer, autre touche pour annuler.", files.Length));
 			
 			this.yes_no_question_object = new YesNoQuestion ("delfile", files);
 		}
 
-		private void DirCommand ()
+		private async Task DirCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
@@ -943,9 +1012,9 @@ namespace GL_ESPALDA
 				if ((String)espalda_line_parser.COMPONENTS[1] == "-h")
 				{
 					// display help
-					NewOutputLine ("Syntaxe : dir -h -l");
-					NewOutputLine ("-h : aide");
-					NewOutputLine ("-l : liste");
+					await NewOutputLine ("Syntaxe : dir -h -l");
+                    await NewOutputLine("-h : aide");
+                    await NewOutputLine("-l : liste");
 					return;
 				}
 			}
@@ -1013,14 +1082,14 @@ namespace GL_ESPALDA
 						}
 						else
 						{
-							NewOutputLine ("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
+                            await NewOutputLine("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
 							in_row = 0;
 						}
 					}
 					else
 					{
-						// One by line
-						NewOutputLine ("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
+                        // One by line
+                        await NewOutputLine("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
 					}
 				}
 			}
@@ -1030,17 +1099,17 @@ namespace GL_ESPALDA
 				s = String.Format ("{0} répertoire(s)", dirs_number);
 			else
 				s = "1 répertoire";
-			NewOutputLine (s);
+            await NewOutputLine(s);
 		}
 
-		private void DtCommand ()
+		private async Task DtCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			DateTime now = DateTime.Now;
-			NewOutputLine (String.Format ("{0:00}/{1:00}/{2:0000} {3:00}h{4:00}m{5:00}s", now.Day, now.Month, now.Year, now.Hour, now.Minute, now.Second));
+			await NewOutputLine (String.Format ("{0:00}/{1:00}/{2:0000} {3:00}h{4:00}m{5:00}s", now.Day, now.Month, now.Year, now.Hour, now.Minute, now.Second));
 		}
 
-		private void ExecutableCommand ()
+		private async Task ExecutableCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
@@ -1058,12 +1127,12 @@ namespace GL_ESPALDA
 			if (extension != "exe")
 			{
 				String openwith = "";
-				if ((openwith = GetOpenWith (extension)) != "")
+				if ((openwith = await GetOpenWith (extension)) != "")
 				{
 					String[] temp = Directory.GetFiles (line_start.Substring (0, line_start.Length - 1), file_name);
 					if (temp.Length == 1)
 					{
-						OpenFile (line_start.Substring (0, line_start.Length - 1), openwith, file_name);
+						await OpenFile (line_start.Substring (0, line_start.Length - 1), openwith, file_name);
 						return;
 					}
 				}
@@ -1093,9 +1162,9 @@ namespace GL_ESPALDA
 					dir = dir.Substring (0, dir.Length - 1);
 				String[] dirs = new String[0];
 				if (dir.IndexOf (":/") == -1)
-					dir = GoToDir (line_start.Substring (0, line_start.Length - 1), dir);
+					dir = await GoToDir (line_start.Substring (0, line_start.Length - 1), dir);
 				else
-					dir = GoToDir (dir.Substring (0, dir.IndexOf (":/") + 2), dir.Substring (dir.IndexOf (":/") + 2));
+					dir = await GoToDir (dir.Substring (0, dir.IndexOf (":/") + 2), dir.Substring (dir.IndexOf (":/") + 2));
 				
 				if (dir != "")
 				{
@@ -1352,16 +1421,16 @@ namespace GL_ESPALDA
 				}
 				else
 				{
-					NewOutputLine ("Pas commande ni .exe ni .bat");
+                    await NewOutputLine("Pas commande ni .exe ni .bat");
 				}
 			}
 			else
 			{
-				NewOutputLine ("Pas commande ni .exe ni .bat");
+                await NewOutputLine("Pas commande ni .exe ni .bat");
 			}
 		}
 
-		private void FileCommand ()
+		private async Task FileCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
@@ -1369,11 +1438,11 @@ namespace GL_ESPALDA
 			{
 				if ((String)espalda_line_parser.COMPONENTS[1] == "-h")
 				{
-					// display help
-					NewOutputLine ("Syntaxe : file -h -l -p");
-					NewOutputLine ("-h : aide");
-					NewOutputLine ("-l : liste");
-					NewOutputLine ("-p : détails");
+                    // display help
+                    await NewOutputLine("Syntaxe : file -h -l -p");
+                    await NewOutputLine("-h : aide");
+                    await NewOutputLine("-l : liste");
+                    await NewOutputLine("-p : détails");
 					return;
 				}
 			}
@@ -1449,7 +1518,7 @@ namespace GL_ESPALDA
 					}
 					else
 					{
-						NewOutputLine (dir.Substring (dir.LastIndexOf ("/") + 1));
+                        await NewOutputLine(dir.Substring (dir.LastIndexOf ("/") + 1));
 						if (properties)
 						{
 							FileInfo fi = new FileInfo(dir);
@@ -1471,7 +1540,7 @@ namespace GL_ESPALDA
 						text = text.PadRight (22, '_');
 						s = String.Format ("{0}", fi.Length);
 						files_size += fi.Length;
-						s = ProcessNumberIntoSpaces (s);
+						s = await ProcessNumberIntoSpaces(s);
 						text = text.PadRight (32 - s.Length, '_');
 						text += s;
 						text = text.PadRight (40, '_');
@@ -1479,8 +1548,8 @@ namespace GL_ESPALDA
 					}
 					else
 						text = dir.Substring (dir.LastIndexOf ("/") + 1);
-						
-					NewOutputLine (text);
+
+                    await NewOutputLine(text);
 				}	// fin de else de if (!list)
 
 			} // fin de foreach (String dir in dirs)
@@ -1492,14 +1561,14 @@ namespace GL_ESPALDA
 			{
 				s = String.Format ("{0}",
 					files_size);
-				s = ProcessNumberIntoSpaces (s);
+				s = await ProcessNumberIntoSpaces (s);
 				s += " octets";
 				text += "     " + s;
 			}
-			NewOutputLine (text);
+            await NewOutputLine(text);
 		}
 
-		private void GLAtomicCommand ()
+		private async Task GLAtomicCommand ()
 		{
 			Process p = null;
 			try
@@ -1512,7 +1581,7 @@ namespace GL_ESPALDA
 								
 				p.Start ();
 
-				MinCommand ();
+				await MinCommand ();
 
 			}
 			catch (Exception ex)
@@ -1522,8 +1591,9 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private void GLDoorsCommand ()
+		private async Task GLDoorsCommand ()
 		{
+			await Task.CompletedTask;
 			Process p = null;
 			try
 			{
@@ -1550,16 +1620,17 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private void HaltCommand ()
+		private async Task HaltCommand ()
 		{
-			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
+			await NewOutputLine("Désactivé pour le moment."); ;
+			/*espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
 			NewOutputLine ("Arreter le PC? 'y' pour continuer, autre touche pour annuler");
 
-			yes_no_question_object = new YesNoQuestion ("Halt", null);
+			yes_no_question_object = new YesNoQuestion ("Halt", null);*/
 		}
 
-		private void HelpCommand ()
+		private async Task HelpCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			int in_row = 0;
@@ -1575,27 +1646,52 @@ namespace GL_ESPALDA
 				else
 				{
 					if (str != "")
-						NewOutputLine (str);
+						await NewOutputLine (str);
 					str = commands[index];
 					in_row = 1;
 				}
 
 			}
 			if (str != "")
-				NewOutputLine (str);
+				await NewOutputLine (str);
 		}
 
-		private void HrmCommand ()
+		private async Task HarmCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
-			DateTime today = DateTime.Now;
+			int done_hours = 0;
+			int total_hours = 8 * 3 + 7;
 
-			TimeSpan one_day = new TimeSpan (1, 0, 0, 0);
+			var today = DateTime.Now;
+			var dayOfWeek = today.DayOfWeek;
 
-			int hours = 0, total_hours = 0;
+			switch (dayOfWeek)
+			{
+				case DayOfWeek.Tuesday:
+					break;
+				case DayOfWeek.Wednesday:
+					done_hours += 8;
+					break;
+                case DayOfWeek.Thursday:
+                    done_hours += 2 * 8;
+                    break;
+                case DayOfWeek.Friday:
+                    done_hours += 3 * 8;
+                    break;
+                default:
+					break;
+			}
 
-			today += one_day;
+			done_hours += today.Hour - 9;
+
+            float x = 1 - ((float)done_hours / (float)total_hours);
+            x *= 100;
+            await NewOutputLine($"{done_hours}-{x:0.00}");
+
+            /*int hours = 0, total_hours = 0;
+
+			today = today.AddDays(1);
 			while (today.Day < 30)
 			{
 				if (today.Day == 25)
@@ -1605,8 +1701,8 @@ namespace GL_ESPALDA
 				else if ((today.DayOfWeek >= DayOfWeek.Monday) && (today.DayOfWeek <= DayOfWeek.Thursday))
 					hours += 8;
 
-				today += one_day;
-			}
+                today = today.AddDays(1);
+            }
 
 			today = DateTime.Now;
 
@@ -1627,14 +1723,12 @@ namespace GL_ESPALDA
 
 			hours += today_hours;
 
-			String output = "";
 			float x = 1 - ((float) hours / (float) total_hours);
 			x *= 100;
-			output = String.Format ("{0}-{1:0.00}", hours, x);
-			NewOutputLine (output);
-		}
+			await NewOutputLine ($"{hours}-{x:0.00}");*/
+        }
 
-		private void LsCommand ()
+		private async Task LsCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			
@@ -1643,10 +1737,10 @@ namespace GL_ESPALDA
 				if ((String)espalda_line_parser.COMPONENTS[1] == "-h")
 				{
 					// display help
-					NewOutputLine ("Syntaxe : ls -h -l -p");
-					NewOutputLine ("-h : aide");
-					NewOutputLine ("-l : liste");
-					NewOutputLine ("-p : détails");
+					await NewOutputLine ("Syntaxe : ls -h -l -p");
+                    await NewOutputLine("-h : aide");
+                    await NewOutputLine("-l : liste");
+                    await NewOutputLine("-p : détails");
 					return;
 				}
 			}
@@ -1719,14 +1813,14 @@ namespace GL_ESPALDA
 						}
 						else
 						{
-							NewOutputLine ("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
+                            await NewOutputLine("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
 							in_row = 0;
 						}
 					}
 					else
 					{
-						// One by line
-						NewOutputLine ("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
+                        // One by line
+                        await NewOutputLine("[" + dir.Substring (dir.LastIndexOf ("/") + 1) + "]");
 					}
 
 				}
@@ -1755,7 +1849,7 @@ namespace GL_ESPALDA
 					}
 					else
 					{
-						NewOutputLine (dir.Substring (dir.LastIndexOf ("/") + 1));
+                        await NewOutputLine(dir.Substring (dir.LastIndexOf ("/") + 1));
 						in_row = 0;
 					}
 				}
@@ -1772,7 +1866,7 @@ namespace GL_ESPALDA
 						text = text.PadRight (22, '_');
 						s = String.Format ("{0}", fi.Length);
 						files_size += fi.Length;
-						s = ProcessNumberIntoSpaces (s);
+						s = await ProcessNumberIntoSpaces(s);
 						text = text.PadRight (32 - s.Length, '_');
 						text += s;
 						text = text.PadRight (40, '_');
@@ -1780,7 +1874,7 @@ namespace GL_ESPALDA
 					}
 					else
 						text = dir.Substring (dir.LastIndexOf ("/") + 1);
-					NewOutputLine (text);
+                    await NewOutputLine(text);
 				}
 			}
 					
@@ -1788,7 +1882,7 @@ namespace GL_ESPALDA
 				s = String.Format ("{0} répertoire(s)", dirs_number);
 			else
 				s = "1 répertoire";
-			NewOutputLine (s);
+            await NewOutputLine(s);
 					
 			s = String.Format ("{0} fichier(s)",
 				files);
@@ -1797,15 +1891,17 @@ namespace GL_ESPALDA
 			{
 				s = String.Format ("{0}",
 					files_size);
-				s = ProcessNumberIntoSpaces (s);
+				s = await ProcessNumberIntoSpaces (s);
 				s += " octets";
 				text += "     " + s;
 			}
-			NewOutputLine (text);
+            await NewOutputLine(text);
 		}
 
-		private void MinCommand ()
+		private async Task MinCommand ()
 		{
+			await Task.CompletedTask;
+			
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
 			// Minimize
@@ -1814,7 +1910,7 @@ namespace GL_ESPALDA
 			visible_start_line_number = line_number + 1;
 		}
 
-		private void NewDriveLetter ()
+		private async Task NewDriveLetter ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			// nouveau disque
@@ -1838,45 +1934,47 @@ namespace GL_ESPALDA
 				}
 				if (!found)
 				{
-					NewOutputLine ("Lecteur introuvable");
+                    await NewOutputLine("Lecteur introuvable");
 				}
 			}
 		}
 
-		private void PwdCommand ()
+		private async Task PwdCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
-			NewOutputLine (line_start.Substring (0, line_start.Length - 1));
+            await NewOutputLine(line_start.Substring (0, line_start.Length - 1));
 		}
 
-		private void RebootCommand ()
+		private async Task RebootCommand ()
 		{
-			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
+            await NewOutputLine("Désactivé pour le moment."); ;
+            /*espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 
-			NewOutputLine ("Redémarrer le PC? 'y' pour continuer, autre touche pour annuler");
+            await NewOutputLine("Redémarrer le PC? 'y' pour continuer, autre touche pour annuler");
 
-			yes_no_question_object = new YesNoQuestion ("Reboot", null);
-		}
+			yes_no_question_object = new YesNoQuestion ("Reboot", null);*/
+        }
 		
-		private void SysinfoCommand ()
+		private async Task SysinfoCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			String str = "";
 			str = Environment.MachineName;
 			OperatingSystem sys = Environment.OSVersion;
 			str += "            " + sys.ToString ();
-			NewOutputLine (str);
+			await NewOutputLine (str);
 		}
 
-		private void TimeCommand ()
+		private async Task TimeCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			DateTime now = DateTime.Now;
-			NewOutputLine (String.Format ("{0:00}h{1:00}m{2:00}s", now.Hour, now.Minute, now.Second));
+            await NewOutputLine(String.Format ("{0:00}h{1:00}m{2:00}s", now.Hour, now.Minute, now.Second));
 		}
 
-		private void TitleCommand ()
+		private async Task TitleCommand ()
 		{
+			await Task.CompletedTask;
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			if (espalda_line_parser.COMPONENTS.Count == 1)
 				this.Text = "GL-ESPALDA";
@@ -1893,7 +1991,7 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private void TremCommand ()
+		private async Task TremCommand ()
 		{
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.COMMAND_LINE;
 			String to_time = "1800";
@@ -1949,21 +2047,22 @@ namespace GL_ESPALDA
 			if (remains)
 			{
 				if (diff.Ticks < 0)
-					NewOutputLine ("++++++++++++++++++++++++++++++++++++++++++++++++++");
+                    await NewOutputLine("++++++++++++++++++++++++++++++++++++++++++++++++++");
 				else
-					NewOutputLine ("----------------------------------------------------------------");
+                    await NewOutputLine("----------------------------------------------------------------");
 			}
 			else
 			{
 				if (diff.Ticks < 0)
-					NewOutputLine (String.Format ("-{0:00}h{1:00}m{2:00}", diff.Hours, Math.Abs (diff.Minutes), Math.Abs (diff.Seconds)));
+                    await NewOutputLine(String.Format ("-{0:00}h{1:00}m{2:00}", diff.Hours, Math.Abs (diff.Minutes), Math.Abs (diff.Seconds)));
 				else
-					NewOutputLine (String.Format ("{0:00}h{1:00}m{2:00}", diff.Hours, diff.Minutes, diff.Seconds));
+                    await NewOutputLine(String.Format ("{0:00}h{1:00}m{2:00}", diff.Hours, diff.Minutes, diff.Seconds));
 			}
 		}
 
-		private bool isCommand (String arg)
+		private async Task<bool> isCommand (String arg)
 		{
+			await Task.CompletedTask;
 			for (int i = 0;i < commands.Length; i++)
 			{
 				if (arg.ToLower () == commands[i].ToLower ())
@@ -1976,7 +2075,7 @@ namespace GL_ESPALDA
 		#endregion
 
 		#region TAB_PRESSED
-		private String TabPressed ()
+		private async Task<string> TabPressed ()
 		{
 			String string_to_draw = "";
 			
@@ -2026,7 +2125,7 @@ namespace GL_ESPALDA
 							else
 							{
 								// Trouver les charactères communs
-								String common_string = CommonStringBetweenTwoArrays (files, dirs);
+								String common_string = await CommonStringBetweenTwoArrays(files, dirs);
 								if (common_string.Length > search_criteria.Length - 1)
 									string_to_draw = common_string.Substring (search_criteria.Length - 1);
 							}
@@ -2038,7 +2137,7 @@ namespace GL_ESPALDA
 						search_criteria = search_criteria.TrimStart ();
 						search_criteria += "*";
 						// chercher dans la liste des commandes
-						String[] cmds = GetCommands (search_criteria.Substring (0, search_criteria.Length - 1));
+						String[] cmds = await GetCommands (search_criteria.Substring (0, search_criteria.Length - 1));
 						// chercher d'abord dans le répertoire courant
 						String[] files = Directory.GetFiles (line_start.Substring (0, line_start.Length - 1), search_criteria);
 						String[] dirs = Directory.GetDirectories (line_start.Substring (0, line_start.Length - 1), search_criteria);
@@ -2066,9 +2165,9 @@ namespace GL_ESPALDA
 								{
 									files[index] = files[index].Substring (length);
 								}
-								String common_string = CommonStringBetweenTwoArrays (cmds, files);
-								String common_string2 = CommonStringBetweenTwoArrays (cmds, dirs);
-								common_string = CommonString (common_string, common_string2);
+								String common_string = await CommonStringBetweenTwoArrays(cmds, files);
+								String common_string2 = await CommonStringBetweenTwoArrays(cmds, dirs);
+								common_string = await CommonString(common_string, common_string2);
 								if (common_string.Length > search_criteria.Length - 1)
 									string_to_draw = common_string.Substring (search_criteria.Length - 1);
 								
@@ -2084,7 +2183,7 @@ namespace GL_ESPALDA
 								{
 									files[index] = files[index].Substring (length);
 								}
-								String common_string = CommonStringBetweenTwoArrays (cmds, files);
+								String common_string = await CommonStringBetweenTwoArrays(cmds, files);
 								if (common_string.Length > search_criteria.Length - 1)
 									string_to_draw = common_string.Substring (search_criteria.Length - 1);
 								else
@@ -2093,7 +2192,7 @@ namespace GL_ESPALDA
 									string_to_draw = string_to_draw.Substring (line_start.Length);
 									string_to_draw = string_to_draw.Substring (0, string_to_draw.Length - 1);
 									espalda_lines[line_number - 1].TEXT = line_start + "file " + search_criteria + ".*_";
-									frmEspaldaMain_KeyDown (null, new KeyEventArgs (Keys.Enter));
+									await frmEspaldaMain_KeyDown (null, new KeyEventArgs (Keys.Enter));
 								}
 							}
 							else if (files.Length > 0 && cmds.Length == 0 && dirs.Length > 0)
@@ -2111,7 +2210,7 @@ namespace GL_ESPALDA
 								{
 									dirs[index] = dirs[index].Substring (length);
 								}
-								String common_string = CommonStringBetweenTwoArrays (dirs, files);
+								String common_string = await CommonStringBetweenTwoArrays(dirs, files);
 								if (common_string.Length > search_criteria.Length - 1)
 									string_to_draw = common_string.Substring (search_criteria.Length - 1);
 								else
@@ -2120,7 +2219,7 @@ namespace GL_ESPALDA
 									string_to_draw = string_to_draw.Substring (line_start.Length);
 									string_to_draw = string_to_draw.Substring (0, string_to_draw.Length - 1);
 									espalda_lines[line_number - 1].TEXT = line_start + "ls " + search_criteria + ".*_";
-									frmEspaldaMain_KeyDown (null, new KeyEventArgs (Keys.Enter));
+									await frmEspaldaMain_KeyDown (null, new KeyEventArgs (Keys.Enter));
 								}
 							}
 						}	// fin de if ((files.Length > 0) || (cmds.Length > 0) || (dirs.Length > 0))
@@ -2165,7 +2264,7 @@ namespace GL_ESPALDA
 				else
 				{
 					int start_index = 1;
-					if (!isCommand ((String)espalda_line_parser.COMPONENTS[0]))
+					if (!await isCommand ((String)espalda_line_parser.COMPONENTS[0]))
 					{
 						start_index = 0;
 					}
@@ -2214,7 +2313,7 @@ namespace GL_ESPALDA
 							else if ((dirs.Length > 0) || (files.Length > 0))
 							{
 								// Trouver les charactères communs
-								String common_string = CommonStringBetweenTwoArrays (files, dirs);
+								String common_string = await CommonStringBetweenTwoArrays(files, dirs);
 								if (common_string.Length > search_criteria.Length - 1)
 									string_to_draw = common_string.Substring (search_criteria.Length - 1);
 							}
@@ -2274,7 +2373,7 @@ namespace GL_ESPALDA
 						else	// else de if (dirs.Length == 1 && files.Length == 0)
 						{
 							// Trouver les charactères communs
-							String common_string = CommonStringBetweenTwoArrays (files, dirs);
+							String common_string = await CommonStringBetweenTwoArrays(files, dirs);
 							if (line_start.Length != 4)
 								common_string = common_string.Substring (line_start.Length - 4 + 1);
 							if (common_string.Length > search_criteria.Length - 1)
@@ -2328,8 +2427,9 @@ namespace GL_ESPALDA
 		#endregion
 
 		#region GoToDir
-		private String GoToDir (String start_dir, String dir)
+		private async Task<string> GoToDir (String start_dir, String dir)
 		{
+			await Task.CompletedTask;
 			try
 			{
 				String temp_dir = dir.Replace ("\\", "/");
@@ -2394,8 +2494,9 @@ namespace GL_ESPALDA
 		#endregion
 
 		#region GENERAL_FUNCTIONS
-		private void CheckEndOfLines ()
+		private async Task CheckEndOfLines ()
 		{
+			await Task.CompletedTask;
 			if (line_number >= espalda_lines.Length)
 			{
 				// lines
@@ -2410,8 +2511,9 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private String CommonString (String str1, String str2)
+		private async Task<string> CommonString (String str1, String str2)
 		{
+			await Task.CompletedTask;
 			int length = (str1.Length >= str2.Length)?str2.Length:str1.Length;
 			String common_string = "";
 			for (int index = 0; index < length; index++)
@@ -2426,7 +2528,7 @@ namespace GL_ESPALDA
 			return common_string;
 		}
 
-		private String CommonStringBetweenTwoArrays (String[] arr1, String[] arr2)
+		private async Task<string> CommonStringBetweenTwoArrays (String[] arr1, String[] arr2)
 		{
 			String common_string = "";
 			int ind = 0;
@@ -2441,9 +2543,9 @@ namespace GL_ESPALDA
 				{
 					arr1[ind + 1] = arr1[ind + 1].Replace ("\\", "/");
 					if (arr1[ind + 1].IndexOf ("/") != -1)
-						common_string = CommonString (common_string, arr1[ind + 1].Substring (arr1[ind + 1].IndexOf ("/") + 1));
+						common_string = await CommonString (common_string, arr1[ind + 1].Substring (arr1[ind + 1].IndexOf ("/") + 1));
 					else
-						common_string = CommonString (common_string, arr1[ind + 1]);
+						common_string = await CommonString (common_string, arr1[ind + 1]);
 					ind++;
 				}
 				ind = -1;
@@ -2461,17 +2563,18 @@ namespace GL_ESPALDA
 			{
 				arr2[ind + 1] = arr2[ind + 1].Replace ("\\", "/");
 				if (arr2[ind + 1].IndexOf ("/") != -1)
-					common_string = CommonString (common_string, arr2[ind + 1].Substring (arr2[ind + 1].IndexOf ("/") + 1));
+					common_string = await CommonString (common_string, arr2[ind + 1].Substring (arr2[ind + 1].IndexOf ("/") + 1));
 				else
-					common_string = CommonString (common_string, arr2[ind + 1]);
+					common_string = await CommonString (common_string, arr2[ind + 1]);
 				ind++;
 			}
 
 			return common_string;
 		}
 
-		private String[] GetCommands (String search_criteria)
+		private async Task<string[]> GetCommands (String search_criteria)
 		{
+			await Task.CompletedTask;
 			if (search_criteria == "")
 				return commands;
 
@@ -2491,8 +2594,9 @@ namespace GL_ESPALDA
 			return ret_value;
 		}
 
-		private String GetOpenWith (String extension)
+		private async Task<string> GetOpenWith (String extension)
 		{
+			await Task.CompletedTask;
 			///
 			/// Open with
 			/// HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.log
@@ -2566,9 +2670,10 @@ namespace GL_ESPALDA
 			return ret_value;
 		}
 
-		private void InitializeLinesText ()
+		private async Task InitializeLinesText ()
 		{
-			for (int i = 0; i < max_lines_number; i++)
+            await Task.CompletedTask;
+            for (int i = 0; i < max_lines_number; i++)
 			{
 				espalda_lines[i] = new EspaldaLine ();
 				espalda_lines[i].TEXT = "";
@@ -2577,8 +2682,9 @@ namespace GL_ESPALDA
 			espalda_lines[0].TEXT = line_start + "_";
 		}
 
-		private void LineVisibilityCheck ()
+		private async Task LineVisibilityCheck ()
 		{
+			await Task.CompletedTask;
 			if (line_number + 1 >= visible_start_line_number + max_visible_lines_number)
 			{
 				visible_start_line_number++;
@@ -2589,18 +2695,19 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private void NewOutputLine (String text)
+		private async Task NewOutputLine (String text)
 		{
-			CheckEndOfLines ();
+			await CheckEndOfLines ();
 			line_number++;
 			espalda_lines[line_number - 1].TEXT = text;
 			espalda_lines[line_number - 1].TYPE = EspaldaLine.EspaldaLineType.OUTPUT_LINE;
-			LineVisibilityCheck ();
+			await LineVisibilityCheck ();
 		}
 
-		private void OpenFile (String directory, String openwith, String file)
+		private async Task OpenFile (String directory, String openwith, String file)
 		{
-			Process p = null;
+            await Task.CompletedTask;
+            Process p = null;
 			try
 			{
 				p = new Process();
@@ -2634,9 +2741,10 @@ namespace GL_ESPALDA
 			}
 		}
 
-		private String ProcessNumberIntoSpaces (String str)
+		private async Task<string> ProcessNumberIntoSpaces (String str)
 		{
-			String s = str;
+            await Task.CompletedTask;
+            string s = str;
 			int l = 0;
 			while (l < s.Length)
 			{
@@ -2650,8 +2758,9 @@ namespace GL_ESPALDA
 		#endregion
 
 		#region CONTROLS_EVENTS
-		private void vScrollBar_Scroll(object sender, System.Windows.Forms.ScrollEventArgs e)
+		private async Task vScrollBar_Scroll(object sender, System.Windows.Forms.ScrollEventArgs e)
 		{
+			await Task.CompletedTask;
 			if (e.Type == ScrollEventType.SmallIncrement)
 			{
 				new_scroll_value = e.NewValue;
