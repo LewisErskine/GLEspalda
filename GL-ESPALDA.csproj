@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" xmlns:Conversion="urn:Conversion" ToolsVersion="4.0">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" xmlns:Conversion="urn:Conversion" ToolsVersion="12.0">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -11,7 +11,7 @@
     <ApplicationIcon>App.ico</ApplicationIcon>
     <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
     <NoConfig>false</NoConfig>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <TargetFrameworkProfile />
     <NoWin32Manifest>False</NoWin32Manifest>
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
@@ -92,7 +92,9 @@
     <Compile Include="EspaldaLine.cs" />
     <Compile Include="EspaldaLineParser.cs" />
     <Compile Include="EspaldaWindowsShutdown.cs" />
-    <Compile Include="frmEspaldaMain.cs" />
+    <Compile Include="frmEspaldaMain.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <EmbeddedResource Include="frmEspaldaMain.resx">
       <DependentUpon>frmEspaldaMain.cs</DependentUpon>
     </EmbeddedResource>
