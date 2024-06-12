@@ -1,107 +1,65 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" xmlns:Conversion="urn:Conversion" ToolsVersion="12.0">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{B022AF14-D09D-49F2-A611-0A6EB0AAFDDA}</ProjectGuid>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>GL_ESPALDA</RootNamespace>
-    <AssemblyName>GL-ESPALDA</AssemblyName>
     <OutputType>WinExe</OutputType>
     <ApplicationIcon>App.ico</ApplicationIcon>
     <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
     <NoConfig>false</NoConfig>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <TargetFrameworkProfile />
     <NoWin32Manifest>False</NoWin32Manifest>
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
     <NoStdLib>False</NoStdLib>
-    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
-    <DebugType>Full</DebugType>
     <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
-    <WarningLevel>4</WarningLevel>
-    <SignAssembly>False</SignAssembly>
     <DelaySign>False</DelaySign>
     <OutputPath>obj\</OutputPath>
     <RunCodeAnalysis>False</RunCodeAnalysis>
     <SourceAnalysisOverrideSettingsFile>C:\Users\gregoire\AppData\Roaming\ICSharpCode\SharpDevelop5\Settings.SourceAnalysis</SourceAnalysisOverrideSettingsFile>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugSymbols>false</DebugSymbols>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+    <AssemblyVersion>1.0.%2a</AssemblyVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <DefineConstants>TRACE</DefineConstants>
-    <Optimize>true</Optimize>
-    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
     <StartProgram />
     <StartArguments />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-    <Optimize>False</Optimize>
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
-    <BaseIntermediateOutputPath>obj\</BaseIntermediateOutputPath>
     <StartAction>Project</StartAction>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Platform)' == 'x86' ">
     <BaseAddress>4194304</BaseAddress>
-    <PlatformTarget>x86</PlatformTarget>
     <RegisterForComInterop>False</RegisterForComInterop>
     <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
     <FileAlignment>4096</FileAlignment>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CSharp">
-      <RequiredTargetFramework>4.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System">
+    <Reference Update="System">
       <HintPath>C:\WINNT\Microsoft.NET\Framework\v1.1.4322\System.dll</HintPath>
       <Private />
     </Reference>
-    <Reference Include="System.Core">
+    <Reference Update="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
-    <Reference Include="System.Data">
+    <Reference Update="System.Data">
       <HintPath>C:\WINNT\Microsoft.NET\Framework\v1.1.4322\System.Data.dll</HintPath>
       <Private />
     </Reference>
-    <Reference Include="System.Data.DataSetExtensions">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="System.Drawing">
+    <Reference Update="System.Drawing">
       <HintPath>C:\WINNT\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll</HintPath>
       <Private />
     </Reference>
-    <Reference Include="System.Windows.Forms">
-      <HintPath>C:\WINNT\Microsoft.NET\Framework\v1.1.4322\System.Windows.Forms.dll</HintPath>
-      <Private />
-    </Reference>
-    <Reference Include="System.Xml">
+    <Reference Update="System.Xml">
       <HintPath>C:\WINNT\Microsoft.NET\Framework\v1.1.4322\System.XML.dll</HintPath>
       <Private />
     </Reference>
-    <Reference Include="System.Xml.Linq">
+    <Reference Update="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="App.ico" />
-    <Compile Include="AssemblyInfo.cs" />
-    <Compile Include="EspaldaLine.cs" />
-    <Compile Include="EspaldaLineParser.cs" />
-    <Compile Include="EspaldaWindowsShutdown.cs" />
-    <Compile Include="frmEspaldaMain.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <EmbeddedResource Include="frmEspaldaMain.resx">
-      <DependentUpon>frmEspaldaMain.cs</DependentUpon>
-    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.5.0" />
   </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.Targets" />
 </Project>
